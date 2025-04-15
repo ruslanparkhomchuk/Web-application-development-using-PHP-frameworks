@@ -12,12 +12,58 @@ class StudentController extends Controller
     /**
      * Display a listing of the students.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $students = Student::all();
+        $query = Student::query();
+        
+        // Apply filters based on query parameters
+        if ($request->has('id')) {
+            $query->where('id', $request->input('id'));
+        }
+        
+        if ($request->has('first_name')) {
+            $query->where('first_name', 'like', '%' . $request->input('first_name') . '%');
+        }
+        
+        if ($request->has('last_name')) {
+            $query->where('last_name', 'like', '%' . $request->input('last_name') . '%');
+        }
+        
+        if ($request->has('email')) {
+            $query->where('email', 'like', '%' . $request->input('email') . '%');
+        }
+        
+        if ($request->has('birth_date')) {
+            $query->whereDate('birth_date', $request->input('birth_date'));
+        }
+        
+        if ($request->has('enrollment_date')) {
+            $query->whereDate('enrollment_date', $request->input('enrollment_date'));
+        }
+        
+        if ($request->has('address')) {
+            $query->where('address', 'like', '%' . $request->input('address') . '%');
+        }
+        
+        if ($request->has('phone')) {
+            $query->where('phone', 'like', '%' . $request->input('phone') . '%');
+        }
+        
+        // Get pagination parameters
+        $perPage = $request->input('itemsPerPage', 10);
+        $page = $request->input('page', 1);
+        
+        // Get paginated results
+        $students = $query->paginate($perPage, ['*'], 'page', $page);
         
         return response()->json([
-            'data' => $students
+            'data' => $students->items(),
+            'pagination' => [
+                'currentPage' => $students->currentPage(),
+                'itemsPerPage' => (int) $students->perPage(),
+                'totalItems' => $students->total(),
+                'totalPages' => $students->lastPage()
+            ]
         ]);
     }
 

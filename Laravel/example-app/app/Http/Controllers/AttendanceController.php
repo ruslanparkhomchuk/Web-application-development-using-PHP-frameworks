@@ -14,12 +14,50 @@ class AttendanceController extends Controller
     /**
      * Display a listing of the attendances.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $attendances = Attendance::with(['student', 'class.course', 'class.teacher'])->get();
+        $query = Attendance::with(['student', 'class.course', 'class.teacher']);
+        
+        // Apply filters based on query parameters
+        if ($request->has('id')) {
+            $query->where('id', $request->input('id'));
+        }
+        
+        if ($request->has('student_id')) {
+            $query->where('student_id', $request->input('student_id'));
+        }
+        
+        if ($request->has('class_id')) {
+            $query->where('class_id', $request->input('class_id'));
+        }
+        
+        if ($request->has('date')) {
+            $query->whereDate('date', $request->input('date'));
+        }
+        
+        if ($request->has('status')) {
+            $query->where('status', $request->input('status'));
+        }
+        
+        if ($request->has('remark')) {
+            $query->where('remark', 'like', '%' . $request->input('remark') . '%');
+        }
+        
+        // Get pagination parameters
+        $perPage = $request->input('itemsPerPage', 10);
+        $page = $request->input('page', 1);
+        
+        // Get paginated results
+        $attendances = $query->paginate($perPage, ['*'], 'page', $page);
         
         return response()->json([
-            'data' => $attendances
+            'data' => $attendances->items(),
+            'pagination' => [
+                'currentPage' => $attendances->currentPage(),
+                'itemsPerPage' => (int) $attendances->perPage(),
+                'totalItems' => $attendances->total(),
+                'totalPages' => $attendances->lastPage()
+            ]
         ]);
     }
 

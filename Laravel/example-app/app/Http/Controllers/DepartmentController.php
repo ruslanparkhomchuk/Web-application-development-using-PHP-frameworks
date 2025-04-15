@@ -13,12 +13,50 @@ class DepartmentController extends Controller
     /**
      * Display a listing of the departments.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $departments = Department::with('head')->get();
+        $query = Department::with('head');
+        
+        // Apply filters based on query parameters
+        if ($request->has('id')) {
+            $query->where('id', $request->input('id'));
+        }
+        
+        if ($request->has('name')) {
+            $query->where('name', 'like', '%' . $request->input('name') . '%');
+        }
+        
+        if ($request->has('code')) {
+            $query->where('code', 'like', '%' . $request->input('code') . '%');
+        }
+        
+        if ($request->has('location')) {
+            $query->where('location', 'like', '%' . $request->input('location') . '%');
+        }
+        
+        if ($request->has('description')) {
+            $query->where('description', 'like', '%' . $request->input('description') . '%');
+        }
+        
+        if ($request->has('head_id')) {
+            $query->where('head_id', $request->input('head_id'));
+        }
+        
+        // Get pagination parameters
+        $perPage = $request->input('itemsPerPage', 10);
+        $page = $request->input('page', 1);
+        
+        // Get paginated results
+        $departments = $query->paginate($perPage, ['*'], 'page', $page);
         
         return response()->json([
-            'data' => $departments
+            'data' => $departments->items(),
+            'pagination' => [
+                'currentPage' => $departments->currentPage(),
+                'itemsPerPage' => (int) $departments->perPage(),
+                'totalItems' => $departments->total(),
+                'totalPages' => $departments->lastPage()
+            ]
         ]);
     }
 

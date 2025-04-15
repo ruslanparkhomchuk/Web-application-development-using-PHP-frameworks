@@ -13,12 +13,58 @@ class CourseController extends Controller
     /**
      * Display a listing of the courses.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $courses = Course::with('department')->get();
+        $query = Course::with('department');
+        
+        // Apply filters based on query parameters
+        if ($request->has('id')) {
+            $query->where('id', $request->input('id'));
+        }
+        
+        if ($request->has('name')) {
+            $query->where('name', 'like', '%' . $request->input('name') . '%');
+        }
+        
+        if ($request->has('code')) {
+            $query->where('code', 'like', '%' . $request->input('code') . '%');
+        }
+        
+        if ($request->has('description')) {
+            $query->where('description', 'like', '%' . $request->input('description') . '%');
+        }
+        
+        if ($request->has('credits')) {
+            $query->where('credits', $request->input('credits'));
+        }
+        
+        if ($request->has('start_date')) {
+            $query->whereDate('start_date', $request->input('start_date'));
+        }
+        
+        if ($request->has('end_date')) {
+            $query->whereDate('end_date', $request->input('end_date'));
+        }
+        
+        if ($request->has('department_id')) {
+            $query->where('department_id', $request->input('department_id'));
+        }
+        
+        // Get pagination parameters
+        $perPage = $request->input('itemsPerPage', 10);
+        $page = $request->input('page', 1);
+        
+        // Get paginated results
+        $courses = $query->paginate($perPage, ['*'], 'page', $page);
         
         return response()->json([
-            'data' => $courses
+            'data' => $courses->items(),
+            'pagination' => [
+                'currentPage' => $courses->currentPage(),
+                'itemsPerPage' => (int) $courses->perPage(),
+                'totalItems' => $courses->total(),
+                'totalPages' => $courses->lastPage()
+            ]
         ]);
     }
 

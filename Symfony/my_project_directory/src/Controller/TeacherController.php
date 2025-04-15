@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Teacher;
 use App\Repository\TeacherRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\Pagination\Paginator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -25,12 +26,58 @@ class TeacherController extends AbstractController
     }
 
     #[Route('', methods: ['GET'])]
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $teachers = $this->teacherRepository->findAll();
+        $filters = [];
+        
+        // Apply filters based on query parameters
+        if ($request->query->has('id')) {
+            $filters['id'] = $request->query->get('id');
+        }
+        
+        if ($request->query->has('firstName')) {
+            $filters['firstName'] = $request->query->get('firstName');
+        }
+        
+        if ($request->query->has('lastName')) {
+            $filters['lastName'] = $request->query->get('lastName');
+        }
+        
+        if ($request->query->has('email')) {
+            $filters['email'] = $request->query->get('email');
+        }
+        
+        if ($request->query->has('phone')) {
+            $filters['phone'] = $request->query->get('phone');
+        }
+        
+        if ($request->query->has('department')) {
+            $filters['department'] = $request->query->get('department');
+        }
+        
+        if ($request->query->has('hireDate')) {
+            $filters['hireDate'] = new \DateTime($request->query->get('hireDate'));
+        }
+        
+        // Pagination parameters
+        $page = max(1, $request->query->getInt('page', 1));
+        $itemsPerPage = max(1, $request->query->getInt('itemsPerPage', 10));
+        
+        // Get paginated and filtered results
+        $result = $this->getPaginatedAndFilteredResults(Teacher::class, $filters, $page, $itemsPerPage);
+        
+        // Calculate total pages
+        $totalItems = count($result);
+        $totalPages = ceil($totalItems / $itemsPerPage);
         
         return $this->json([
-            'data' => $teachers,
+            'data' => $result,
+            'pagination' => [
+                'page' => $page,
+                'itemsPerPage' => $itemsPerPage,
+                'totalItems' => $totalItems,
+                'totalPages' => $totalPages
+            ]
         ]);
     }
 
@@ -133,5 +180,46 @@ class TeacherController extends AbstractController
         $this->entityManager->flush();
         
         return $this->json(null, 204);
+    }
+
+
+    /**
+     * Get paginated and filtered results
+     */
+    private function getPaginatedAndFilteredResults(string $entityClass, array $filters = [], int $page = 1, int $itemsPerPage = 10): array
+    {
+        $queryBuilder = $this->entityManager->createQueryBuilder();
+        $queryBuilder->select('e')
+            ->from($entityClass, 'e');
+        
+        // Apply filters dynamically
+        $parameterIndex = 0;
+        foreach ($filters as $field => $value) {
+            $paramName = 'param_' . $parameterIndex++;
+            
+            // Handle special cases for date filters
+            if ($value instanceof \DateTime) {
+                $queryBuilder->andWhere("DATE(e.{$field}) = DATE(:{$paramName})");
+            } else {
+                $queryBuilder->andWhere("e.{$field} = :{$paramName}");
+            }
+            
+            $queryBuilder->setParameter($paramName, $value);
+        }
+        
+        // Apply pagination
+        $queryBuilder->setFirstResult(($page - 1) * $itemsPerPage)
+            ->setMaxResults($itemsPerPage);
+        
+        // Convert to paginator to get correct count
+        $paginator = new Paginator($queryBuilder);
+        
+        // Convert to array
+        $results = [];
+        foreach ($paginator as $entity) {
+            $results[] = $entity;
+        }
+        
+        return $results;
     }
 }

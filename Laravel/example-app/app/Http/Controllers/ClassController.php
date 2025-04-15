@@ -14,12 +14,54 @@ class ClassController extends Controller
     /**
      * Display a listing of the classes.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $classes = ClassModel::with(['course', 'teacher'])->get();
+        $query = ClassModel::with(['course', 'teacher']);
+        
+        // Apply filters based on query parameters
+        if ($request->has('id')) {
+            $query->where('id', $request->input('id'));
+        }
+        
+        if ($request->has('course_id')) {
+            $query->where('course_id', $request->input('course_id'));
+        }
+        
+        if ($request->has('teacher_id')) {
+            $query->where('teacher_id', $request->input('teacher_id'));
+        }
+        
+        if ($request->has('room')) {
+            $query->where('room', 'like', '%' . $request->input('room') . '%');
+        }
+        
+        if ($request->has('schedule')) {
+            $query->where('schedule', 'like', '%' . $request->input('schedule') . '%');
+        }
+        
+        if ($request->has('max_students')) {
+            $query->where('max_students', $request->input('max_students'));
+        }
+        
+        if ($request->has('current_students')) {
+            $query->where('current_students', $request->input('current_students'));
+        }
+        
+        // Get pagination parameters
+        $perPage = $request->input('itemsPerPage', 10);
+        $page = $request->input('page', 1);
+        
+        // Get paginated results
+        $classes = $query->paginate($perPage, ['*'], 'page', $page);
         
         return response()->json([
-            'data' => $classes
+            'data' => $classes->items(),
+            'pagination' => [
+                'currentPage' => $classes->currentPage(),
+                'itemsPerPage' => (int) $classes->perPage(),
+                'totalItems' => $classes->total(),
+                'totalPages' => $classes->lastPage()
+            ]
         ]);
     }
 

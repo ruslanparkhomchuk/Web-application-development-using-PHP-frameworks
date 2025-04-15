@@ -12,12 +12,50 @@ class TeacherController extends Controller
     /**
      * Display a listing of the teachers.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $teachers = Teacher::all();
+        $query = Teacher::query();
+        
+        // Apply filters based on query parameters
+        if ($request->has('id')) {
+            $query->where('id', $request->input('id'));
+        }
+        
+        if ($request->has('first_name')) {
+            $query->where('first_name', 'like', '%' . $request->input('first_name') . '%');
+        }
+        
+        if ($request->has('last_name')) {
+            $query->where('last_name', 'like', '%' . $request->input('last_name') . '%');
+        }
+        
+        if ($request->has('email')) {
+            $query->where('email', 'like', '%' . $request->input('email') . '%');
+        }
+        
+        if ($request->has('phone')) {
+            $query->where('phone', 'like', '%' . $request->input('phone') . '%');
+        }
+        
+        if ($request->has('hire_date')) {
+            $query->whereDate('hire_date', $request->input('hire_date'));
+        }
+        
+        // Get pagination parameters
+        $perPage = $request->input('itemsPerPage', 10);
+        $page = $request->input('page', 1);
+        
+        // Get paginated results
+        $teachers = $query->paginate($perPage, ['*'], 'page', $page);
         
         return response()->json([
-            'data' => $teachers
+            'data' => $teachers->items(),
+            'pagination' => [
+                'currentPage' => $teachers->currentPage(),
+                'itemsPerPage' => (int) $teachers->perPage(),
+                'totalItems' => $teachers->total(),
+                'totalPages' => $teachers->lastPage()
+            ]
         ]);
     }
 

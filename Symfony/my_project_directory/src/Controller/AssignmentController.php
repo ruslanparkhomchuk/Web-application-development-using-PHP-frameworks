@@ -6,6 +6,7 @@ use App\Entity\Assignment;
 use App\Repository\AssignmentRepository;
 use App\Repository\CourseRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\Pagination\Paginator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -29,12 +30,60 @@ class AssignmentController extends AbstractController
     }
 
     #[Route('', methods: ['GET'])]
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $assignments = $this->assignmentRepository->findAll();
+        $queryBuilder = $this->entityManager->createQueryBuilder();
+        $queryBuilder->select('a')
+            ->from(Assignment::class, 'a')
+            ->join('a.course', 'c');
         
+        // Apply filters based on query parameters
+        if ($request->query->has('id')) {
+            $queryBuilder->andWhere('a.id = :id')
+                ->setParameter('id', $request->query->get('id'));
+        }
+        
+        if ($request->query->has('courseId')) {
+            $queryBuilder->andWhere('c.id = :courseId')
+                ->setParameter('courseId', $request->query->get('courseId'));
+        }
+        
+        if ($request->query->has('title')) {
+            $queryBuilder->andWhere('a.title LIKE :title')
+                ->setParameter('title', '%' . $request->query->get('title') . '%');
+        }
+        
+        if ($request->query->has('description')) {
+            $queryBuilder->andWhere('a.description LIKE :description')
+                ->setParameter('description', '%' . $request->query->get('description') . '%');
+        }
+        
+        if ($request->query->has('dueDate')) {
+            $queryBuilder->andWhere('DATE(a.dueDate) = DATE(:dueDate)')
+                ->setParameter('dueDate', new \DateTime($request->query->get('dueDate')));
+        }
+        
+        if ($request->query->has('maxScore')) {
+            $queryBuilder->andWhere('a.maxScore = :maxScore')
+                ->setParameter('maxScore', $request->query->get('maxScore'));
+        }
+        
+        // Pagination parameters
+        $page = max(1, $request->query->getInt('page', 1));
+        $itemsPerPage = max(1, $request->query->getInt('itemsPerPage', 10));
+        
+        // Apply pagination
+        $queryBuilder->setFirstResult(($page - 1) * $itemsPerPage)
+            ->setMaxResults($itemsPerPage);
+        
+        // Execute query with pagination
+        $paginator = new Paginator($queryBuilder);
+        $totalItems = count($paginator);
+        $totalPages = ceil($totalItems / $itemsPerPage);
+        
+        // Format the data
         $data = [];
-        foreach ($assignments as $assignment) {
+        foreach ($paginator as $assignment) {
             $data[] = [
                 'id' => $assignment->getId(),
                 'course' => [
@@ -51,6 +100,12 @@ class AssignmentController extends AbstractController
         
         return $this->json([
             'data' => $data,
+            'pagination' => [
+                'page' => $page,
+                'itemsPerPage' => $itemsPerPage,
+                'totalItems' => $totalItems,
+                'totalPages' => $totalPages
+            ]
         ]);
     }
 

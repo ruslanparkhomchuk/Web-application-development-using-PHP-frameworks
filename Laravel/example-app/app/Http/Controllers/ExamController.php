@@ -13,12 +13,50 @@ class ExamController extends Controller
     /**
      * Display a listing of the exams.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $exams = Exam::with('course')->get();
+        $query = Exam::with('course');
+        
+        // Apply filters based on query parameters
+        if ($request->has('id')) {
+            $query->where('id', $request->input('id'));
+        }
+        
+        if ($request->has('course_id')) {
+            $query->where('course_id', $request->input('course_id'));
+        }
+        
+        if ($request->has('date')) {
+            $query->whereDate('date', $request->input('date'));
+        }
+        
+        if ($request->has('duration')) {
+            $query->where('duration', 'like', '%' . $request->input('duration') . '%');
+        }
+        
+        if ($request->has('location')) {
+            $query->where('location', 'like', '%' . $request->input('location') . '%');
+        }
+        
+        if ($request->has('type')) {
+            $query->where('type', $request->input('type'));
+        }
+        
+        // Get pagination parameters
+        $perPage = $request->input('itemsPerPage', 10);
+        $page = $request->input('page', 1);
+        
+        // Get paginated results
+        $exams = $query->paginate($perPage, ['*'], 'page', $page);
         
         return response()->json([
-            'data' => $exams
+            'data' => $exams->items(),
+            'pagination' => [
+                'currentPage' => $exams->currentPage(),
+                'itemsPerPage' => (int) $exams->perPage(),
+                'totalItems' => $exams->total(),
+                'totalPages' => $exams->lastPage()
+            ]
         ]);
     }
 

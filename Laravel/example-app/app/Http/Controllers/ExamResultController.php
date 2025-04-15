@@ -14,12 +14,30 @@ class ExamResultController extends Controller
     /**
      * Display a listing of the exam results.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $examResults = ExamResult::with(['exam.course', 'student'])->get();
+        $query = Student::query();
+        
+        // Apply filters based on query parameters
+        if ($request->has('department_id')) {
+            $query->where('department_id', $request->input('department_id'));
+        }
+        
+        // Get pagination parameters
+        $perPage = $request->input('itemsPerPage', 10);
+        $page = $request->input('page', 1);
+        
+        // Get paginated results
+        $courses = $query->paginate($perPage, ['*'], 'page', $page);
         
         return response()->json([
-            'data' => $examResults
+            'data' => $courses->items(),
+            'pagination' => [
+                'currentPage' => $courses->currentPage(),
+                'itemsPerPage' => (int) $courses->perPage(),
+                'totalItems' => $courses->total(),
+                'totalPages' => $courses->lastPage()
+            ]
         ]);
     }
 

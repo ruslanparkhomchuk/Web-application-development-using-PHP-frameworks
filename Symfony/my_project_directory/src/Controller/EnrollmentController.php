@@ -7,6 +7,7 @@ use App\Repository\CourseRepository;
 use App\Repository\EnrollmentRepository;
 use App\Repository\StudentRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\Pagination\Paginator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -33,12 +34,61 @@ class EnrollmentController extends AbstractController
     }
 
     #[Route('', methods: ['GET'])]
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $enrollments = $this->enrollmentRepository->findAll();
+        $queryBuilder = $this->entityManager->createQueryBuilder();
+        $queryBuilder->select('e')
+            ->from(Enrollment::class, 'e')
+            ->join('e.student', 's')
+            ->join('e.course', 'c');
         
+        // Apply filters based on query parameters
+        if ($request->query->has('id')) {
+            $queryBuilder->andWhere('e.id = :id')
+                ->setParameter('id', $request->query->get('id'));
+        }
+        
+        if ($request->query->has('studentId')) {
+            $queryBuilder->andWhere('s.id = :studentId')
+                ->setParameter('studentId', $request->query->get('studentId'));
+        }
+        
+        if ($request->query->has('courseId')) {
+            $queryBuilder->andWhere('c.id = :courseId')
+                ->setParameter('courseId', $request->query->get('courseId'));
+        }
+        
+        if ($request->query->has('enrollmentDate')) {
+            $queryBuilder->andWhere('DATE(e.enrollmentDate) = DATE(:enrollmentDate)')
+                ->setParameter('enrollmentDate', new \DateTime($request->query->get('enrollmentDate')));
+        }
+        
+        if ($request->query->has('grade')) {
+            $queryBuilder->andWhere('e.grade = :grade')
+                ->setParameter('grade', $request->query->get('grade'));
+        }
+        
+        if ($request->query->has('status')) {
+            $queryBuilder->andWhere('e.status = :status')
+                ->setParameter('status', $request->query->get('status'));
+        }
+        
+        // Pagination parameters
+        $page = max(1, $request->query->getInt('page', 1));
+        $itemsPerPage = max(1, $request->query->getInt('itemsPerPage', 10));
+        
+        // Apply pagination
+        $queryBuilder->setFirstResult(($page - 1) * $itemsPerPage)
+            ->setMaxResults($itemsPerPage);
+        
+        // Execute query with pagination
+        $paginator = new Paginator($queryBuilder);
+        $totalItems = count($paginator);
+        $totalPages = ceil($totalItems / $itemsPerPage);
+        
+        // Format the data
         $data = [];
-        foreach ($enrollments as $enrollment) {
+        foreach ($paginator as $enrollment) {
             $data[] = [
                 'id' => $enrollment->getId(),
                 'student' => [
@@ -59,6 +109,12 @@ class EnrollmentController extends AbstractController
         
         return $this->json([
             'data' => $data,
+            'pagination' => [
+                'page' => $page,
+                'itemsPerPage' => $itemsPerPage,
+                'totalItems' => $totalItems,
+                'totalPages' => $totalPages
+            ]
         ]);
     }
 
