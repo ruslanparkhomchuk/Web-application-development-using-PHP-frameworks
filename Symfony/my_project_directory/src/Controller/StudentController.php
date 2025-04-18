@@ -134,6 +134,7 @@ class StudentController extends AbstractController
     #[Route('/{id}', methods: ['PUT'])]
     public function update(int $id, Request $request): JsonResponse
     {
+        $this->denyAccessUnlessGranted('ROLE_MANAGER');
         $student = $this->studentRepository->find($id);
         
         if (!$student) {

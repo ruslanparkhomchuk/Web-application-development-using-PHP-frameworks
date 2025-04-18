@@ -9,6 +9,9 @@ use App\Http\Controllers\ExamResultController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\TeacherController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\UserController;
 
 // Student routes
 Route::get('/students', [StudentController::class, 'index']);
@@ -65,3 +68,40 @@ Route::get('/exam-results/{id}', [ExamResultController::class, 'show']);
 Route::post('/exam-results', [ExamResultController::class, 'store']);
 Route::put('/exam-results/{id}', [ExamResultController::class, 'update']);
 Route::delete('/exam-results/{id}', [ExamResultController::class, 'destroy']);
+
+// Authentication Routes
+Route::group(['prefix' => 'auth'], function () {
+  Route::post('register', [AuthController::class, 'register']);
+  Route::post('login', [AuthController::class, 'login']);
+  
+  Route::group(['middleware' => 'jwt.verify'], function () {
+      Route::post('logout', [AuthController::class, 'logout']);
+      Route::post('refresh', [AuthController::class, 'refresh']);
+      Route::get('me', [AuthController::class, 'me']);
+  });
+});
+
+// User Routes with Role-Based Access Control
+Route::group(['prefix' => 'users', 'middleware' => 'jwt.verify'], function () {
+  // Route accessible to all authenticated users (their own profile)
+  Route::get('profile', [AuthController::class, 'me']);
+  
+  // Routes accessible to Manager and Admin only
+  Route::group(['middleware' => 'role:manager,admin'], function () {
+      Route::get('', [UserController::class, 'index']);
+  });
+  
+  // Routes with specific role requirements
+  Route::get('{id}', [UserController::class, 'show']); // Access controlled in controller
+  Route::put('{id}', [UserController::class, 'update']); // Access controlled in controller
+  
+  // Routes accessible to Admin only
+  Route::group(['middleware' => 'role:admin'], function () {
+      Route::post('', [UserController::class, 'store']);
+  });
+  
+  // Routes accessible to Manager and Admin
+  Route::group(['middleware' => 'role:manager,admin'], function () {
+      Route::delete('{id}', [UserController::class, 'destroy']); // Further access controlled in controller
+  });
+});
