@@ -4,58 +4,29 @@ namespace App\Http\Controllers;
 
 use App\Models\Course;
 use App\Models\Department;
+use App\Repositories\CourseRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class CourseController extends Controller
 {
+    protected $courseRepository;
+
+    /**
+     * CourseController constructor.
+     */
+    public function __construct(CourseRepository $courseRepository)
+    {
+        $this->courseRepository = $courseRepository;
+    }
+
     /**
      * Display a listing of the courses.
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Course::with('department');
-        
-        // Apply filters based on query parameters
-        if ($request->has('id')) {
-            $query->where('id', $request->input('id'));
-        }
-        
-        if ($request->has('name')) {
-            $query->where('name', 'like', '%' . $request->input('name') . '%');
-        }
-        
-        if ($request->has('code')) {
-            $query->where('code', 'like', '%' . $request->input('code') . '%');
-        }
-        
-        if ($request->has('description')) {
-            $query->where('description', 'like', '%' . $request->input('description') . '%');
-        }
-        
-        if ($request->has('credits')) {
-            $query->where('credits', $request->input('credits'));
-        }
-        
-        if ($request->has('start_date')) {
-            $query->whereDate('start_date', $request->input('start_date'));
-        }
-        
-        if ($request->has('end_date')) {
-            $query->whereDate('end_date', $request->input('end_date'));
-        }
-        
-        if ($request->has('department_id')) {
-            $query->where('department_id', $request->input('department_id'));
-        }
-        
-        // Get pagination parameters
-        $perPage = $request->input('itemsPerPage', 10);
-        $page = $request->input('page', 1);
-        
-        // Get paginated results
-        $courses = $query->paginate($perPage, ['*'], 'page', $page);
+        $courses = $this->courseRepository->getFilteredCourses($request);
         
         return response()->json([
             'data' => $courses->items(),
@@ -73,7 +44,7 @@ class CourseController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $course = Course::with('department')->find($id);
+        $course = $this->courseRepository->findById($id);
         
         if (!$course) {
             return response()->json([
@@ -116,7 +87,7 @@ class CourseController extends Controller
             }
         }
         
-        $course = Course::create($request->all());
+        $course = $this->courseRepository->create($request->all());
         
         return response()->json([
             'data' => $course->load('department')
@@ -128,7 +99,7 @@ class CourseController extends Controller
      */
     public function update(Request $request, string $id): JsonResponse
     {
-        $course = Course::find($id);
+        $course = $this->courseRepository->findById($id);
         
         if (!$course) {
             return response()->json([
@@ -161,10 +132,10 @@ class CourseController extends Controller
             }
         }
         
-        $course->update($request->all());
+        $updatedCourse = $this->courseRepository->update($course, $request->all());
         
         return response()->json([
-            'data' => $course->fresh()->load('department')
+            'data' => $updatedCourse
         ]);
     }
 
@@ -173,7 +144,7 @@ class CourseController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $course = Course::find($id);
+        $course = $this->courseRepository->findById($id);
         
         if (!$course) {
             return response()->json([
@@ -181,7 +152,7 @@ class CourseController extends Controller
             ], 404);
         }
         
-        $course->delete();
+        $this->courseRepository->delete($course);
         
         return response()->json(null, 204);
     }
